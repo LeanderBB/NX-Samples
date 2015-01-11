@@ -1,0 +1,3 @@
+nn camera
+ve camera_quat.vert.glsl
+fe camera_quat.frag.glsl
