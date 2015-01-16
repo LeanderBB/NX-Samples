@@ -21,25 +21,28 @@ public:
     }
 
 
-    bool doInit()
+    void doInit() NX_CPP_OVERRIDE
     {
         NXHdl hdl_prog = _gpuResManager.create("programs/triangle.nxprog", nx::kGPUResourceTypeProgram);
 
         if (!hdl_prog.valid())
         {
-            return false;
+            quit();
+            return;
         }
 
         if (!_gpuResManager.isLoaded(hdl_prog))
         {
-            return false;
+            quit();
+            return;
         }
 
         _pProgram = static_cast<NXOGLProgram*>(_gpuResManager.get(hdl_prog));
 
         if (!_pProgram)
         {
-            return false;
+            quit();
+            return;
         }
 
         GLfloat points[] = {
@@ -68,28 +71,28 @@ public:
         if (_colourLoc == -1)
         {
             NXLogError("Failed to located uniform 'inputColour'");
-            return false;
+            quit();
+            return;
         }
 
         glUseProgram(_pProgram->oglHdl());
         glUniform4f (_colourLoc, 1.0f, 0.0f, 0.0f, 1.0f);
-        return true;
     }
 
 
-    void doTerm()
+    void doTerm() NX_CPP_OVERRIDE
     {
 
     }
 
 
 
-    void onResize(const int w, const int h)
+    void onResize(const int w, const int h) NX_CPP_OVERRIDE
     {
         nx::NXLog("Resize %dx%d", w, h);
     }
 
-    void doRun(const double elapsedSec)
+    void doRun(const double elapsedSec) NX_CPP_OVERRIDE
     {
         (void) elapsedSec;
         /* wipe the drawing surface clear */

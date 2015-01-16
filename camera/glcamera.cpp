@@ -66,7 +66,7 @@ public:
 #endif
     }
 
-    void onResize(const int w, const int h)
+    void onResize(const int w, const int h) NX_CPP_OVERRIDE
     {
         nx::NXLog("Resize %dx%d", w, h);
 
@@ -77,7 +77,7 @@ public:
     }
 
 
-    bool doInit()
+    void doInit() NX_CPP_OVERRIDE
     {
 
         glGenBuffers(1, &_vbo);
@@ -89,12 +89,14 @@ public:
 
         if (!hdl_prog.valid())
         {
-            return false;
+            quit();
+            return;
         }
 
         if (!_gpuResManager.isLoaded(hdl_prog))
         {
-            return false;
+            quit();
+            return;
         }
 
         _pProgram = static_cast<NXOGLProgram*>(_gpuResManager.get(hdl_prog));
@@ -120,12 +122,14 @@ public:
 
         if (!_hdlModel.valid())
         {
-            return false;
+            quit();
+            return;
         }
 
         if (!_mediaManager.isLoaded(_hdlModel))
         {
-            return false;
+            quit();
+            return;
         }
 
         NX3DModel* p_model = static_cast<NX3DModel*>(_mediaManager.get(_hdlModel));
@@ -199,10 +203,9 @@ public:
         inputManager()->addInputCtx(this);
 
         system()->window()->setCaptureInput(true);
-        return true;
     }
 
-    void doTerm()
+    void doTerm() NX_CPP_OVERRIDE
     {
         inputManager()->remInputCtx(this);
         if (_hdlModel.valid())
@@ -219,7 +222,7 @@ public:
 
 
 
-    void doRun(const double elapsedSec)
+    void doRun(const double elapsedSec) NX_CPP_OVERRIDE
     {
 
         updateInput(elapsedSec);
@@ -238,7 +241,7 @@ public:
 
 
 
-    virtual bool handleInputEvent(const NXInputEvent& pEvtData)
+    virtual bool handleInputEvent(const NXInputEvent& pEvtData) NX_CPP_OVERRIDE
     {
 
         _deltax = _deltay = 0.0f;

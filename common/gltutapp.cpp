@@ -6,6 +6,8 @@
 #endif
 #include "nx/event/nxeventmanager.h"
 #include "nx/sys/nxsysevents.h"
+#include "nx/util/nxtime.h"
+
 GLTutApp::GLTutApp(const char* name):
     nx::NXApp(name),
     _fileManager(),
@@ -43,7 +45,7 @@ GLTutApp::handleEvent(const nx::NXEventData* pEvtData)
     }
 
     default:
-        nx::NXLogWarning("GLTutAPP: Unknown event type %x", pEvtData->type);
+        return NXApp::handleEvent(pEvtData);
     }
     return false;
 }
@@ -60,52 +62,13 @@ GLTutApp::windowHeight()
     return system()->window()->height();
 }
 
-bool
-GLTutApp::appInit(const int,
-                  const char **)
-{
-
-    if (!_fileManager.init())
-    {
-        return false;
-    }
-    if (!_fileManager.mountArchive("data.yaaf", ""))
-    {
-        return false;
-    }
-    nx::NXLog("Mounted Archive 'data.yaaf'");
-
-    system()->eventManager()->addListener(nx::NXSysEvtWinResize::sEvtType, this);
-    return doInit();
-}
-
-void
-GLTutApp::appTerm()
-{
-    doTerm();
-    _gpuResManager.clear();
-    _mediaManager.clear();
-    _fileManager.shutdown();
-    system()->eventManager()->removeListener(nx::NXSysEvtWinResize::sEvtType, this);
-}
-
-static double
-getTicks()
-{
-#if defined(NX_SYSTEM_SDL2)
-    return (double) SDL_GetTicks()/ 1000.0;
-#else
-    return 0.0;
-#endif
-}
-
 void
 GLTutApp::appRun()
 {
     // update fps
-    static double previous_seconds = getTicks();
+    static double previous_seconds = ((double) nx::nxGetTicks())/ 1000.0;
     static int frame_count;
-    double current_seconds = getTicks();
+    double current_seconds = ((double) nx::nxGetTicks())/ 1000.0;
     double elapsed_seconds = current_seconds - previous_seconds;
     previous_seconds = current_seconds;
     if (elapsed_seconds > 0.25)
@@ -118,8 +81,49 @@ GLTutApp::appRun()
     }
     frame_count++;
 
-    // tick input
-    inputManager()->tick();
-
     doRun(elapsed_seconds);
 }
+
+bool
+GLTutApp::onAppInit(const int,
+                    const char **)
+{
+    if (!_fileManager.init())
+    {
+        return false;
+    }
+#if defined(NX_OS_ANDROID)
+    if (!_fileManager.mountArchive("/storage/sdcard0/data.yaaf", ""))
+#else
+    if (!_fileManager.mountArchive("data.yaaf", ""))
+#endif
+    {
+        return false;
+    }
+    nx::NXLog("Mounted Archive 'data.yaaf'");
+
+    system()->eventManager()->addListener(nx::NXSysEvtWinResize::sEvtType, this);
+    return true;
+}
+
+void
+GLTutApp::onAppWillTerm()
+{
+    _mediaManager.clear();
+    _fileManager.shutdown();
+    system()->eventManager()->removeListener(nx::NXSysEvtWinResize::sEvtType, this);
+}
+
+void
+GLTutApp::onWindowCreated()
+{
+    doInit();
+}
+
+void
+GLTutApp::onWindowWillBeDestroyed()
+{
+    doTerm();
+    _gpuResManager.clear();
+}
+

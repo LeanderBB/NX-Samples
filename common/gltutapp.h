@@ -9,36 +9,42 @@
 #include <nx/media/nxmediamanager.h>
 #include <nx/gpu/nxgpuresourcemanager.h>
 
-class GLTutApp : public nx::NXApp, public nx::NXEventListener
+class GLTutApp : public nx::NXApp
 {
 public:
     GLTutApp(const char* name);
 
     virtual ~GLTutApp();
 
-    virtual void appRun();
+    virtual void appRun() NX_CPP_OVERRIDE;
 
     virtual void setAppOptions(const int ,
                                const char**,
                                nx::NXAppOptions&);
 
-    bool handleEvent(const nx::NXEventData* pEvtData);
-
-    bool appInit(const int, const char **);
-
-    void appTerm();
+    virtual bool handleEvent(const nx::NXEventData* pEvtData) NX_CPP_OVERRIDE;
 
     int windowWidth();
 
     int windowHeight();
 
 protected:
+
+    bool onAppInit(const int,
+                   const char **) NX_CPP_OVERRIDE;
+
+    void onAppWillTerm() NX_CPP_OVERRIDE;
+
+    void onWindowCreated() NX_CPP_OVERRIDE;
+
+    void onWindowWillBeDestroyed() NX_CPP_OVERRIDE;
+
     virtual void doRun(const double currentSeconds) = 0;
 
     virtual void onResize(const int,
                           const int) {}
 
-    virtual bool doInit() { return true;}
+    virtual void doInit() {}
 
     virtual void doTerm() {}
 
