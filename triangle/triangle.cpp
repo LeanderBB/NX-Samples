@@ -11,7 +11,7 @@ class GLTriangle : public GLTutApp
 {
 public:
     GLTriangle():
-        GLTutApp("triangle"),
+        GLTutApp("triangle", "gltriangle"),
         _pProgram(nullptr),
         _vao(0),
         _vbo(0),

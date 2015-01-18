@@ -36,7 +36,7 @@ class GLTutCamera : public GLTutApp, public NXInputCtx
 {
 public:
     GLTutCamera():
-        GLTutApp("camera"),
+        GLTutApp("camera", "glcamera"),
         NXInputCtx("camera_input_ctx", 0),
         _viewMat(),
         _projMat(),

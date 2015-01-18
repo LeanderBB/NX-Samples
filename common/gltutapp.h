@@ -12,7 +12,8 @@
 class GLTutApp : public nx::NXApp
 {
 public:
-    GLTutApp(const char* name);
+    GLTutApp(const char* name,
+             const char* archiveName);
 
     virtual ~GLTutApp();
 
@@ -49,6 +50,7 @@ protected:
     virtual void doTerm() {}
 
 protected:
+    const nx::NXString _archiveName;
     nx::NXFileManager _fileManager;
     nx::NXMediaManager _mediaManager;
     nx::NXGPUResourceManager _gpuResManager;

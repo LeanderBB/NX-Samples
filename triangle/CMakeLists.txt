@@ -15,8 +15,6 @@ set(PROJ_PROGS
     triangle
 )
 
-add_definitions(-DNX_GLTUTAPP_NAME=${PROJ_NAME})
-
 set(ARCHIVE_DIRS
     ${CMAKE_CURRENT_BINARY_DIR}/programs
 )
@@ -31,6 +29,7 @@ NX_CREATE_APP(
     ARCHIVE_DIRS ${ARCHIVE_DIRS}
     SOURCES ${PROJ_SRC}
     HEADERS ${PROJ_HDR}
+    PACKAGE "nx.samples"
 )
 
 target_link_libraries(${PROJ_NAME} ${GLTUTCOMMON_LIBRARIES})

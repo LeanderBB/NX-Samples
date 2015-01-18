@@ -8,8 +8,10 @@
 #include "nx/sys/nxsysevents.h"
 #include "nx/util/nxtime.h"
 
-GLTutApp::GLTutApp(const char* name):
+GLTutApp::GLTutApp(const char* name,
+                   const char* archiveName):
     nx::NXApp(name),
+    _archiveName(archiveName),
     _fileManager(),
     _mediaManager(_fileManager),
     _gpuResManager(_mediaManager)
@@ -92,15 +94,20 @@ GLTutApp::onAppInit(const int,
     {
         return false;
     }
+    nx::NXString archive_path;
 #if defined(NX_OS_ANDROID)
-    if (!_fileManager.mountArchive("/storage/sdcard0/data.yaaf", ""))
+    archive_path = "/storage/sdcard0/nx.samples.";
+    archive_path += _archiveName;
+    archive_path += ".yaaf";
 #else
-    if (!_fileManager.mountArchive("data.yaaf", ""))
+    archive_path =_archiveName();
+    archive_path += ".yaaf";
 #endif
+    if (!_fileManager.mountArchive(archive_path.c_str(), ""))
     {
         return false;
     }
-    nx::NXLog("Mounted Archive 'data.yaaf'");
+    nx::NXLog("Mounted Archive '%s'", archive_path.c_str());
 
     system()->eventManager()->addListener(nx::NXSysEvtWinResize::sEvtType, this);
     return true;

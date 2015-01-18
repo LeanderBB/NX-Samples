@@ -20,20 +20,17 @@ set(ARCHIVE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/data/models
 )
 
-#add_executable(${PROJ_NAME} ${PROJ_HDR} ${PROJ_SRC})
-
-add_definitions(-DNX_GLTUTAPP_NAME=${PROJ_NAME})
 
 NX_CREATE_APP(
     NAME GLCamera
     EXEC_NAME ${PROJ_NAME}
     DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data
     SHADER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data/shaders
-    ARCHIVE_NAME data
     PROGRAMS ${PROJ_PROGS}
     ARCHIVE_DIRS ${ARCHIVE_DIRS}
     SOURCES ${PROJ_SRC}
     HEADERS ${PROJ_HDR}
+    PACKAGE "nx.samples"
 )
 
 target_link_libraries(${PROJ_NAME} ${GLTUTCOMMON_LIBRARIES})
