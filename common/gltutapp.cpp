@@ -100,7 +100,7 @@ GLTutApp::onAppInit(const int,
     archive_path += _archiveName;
     archive_path += ".yaaf";
 #else
-    archive_path =_archiveName();
+    archive_path =_archiveName;
     archive_path += ".yaaf";
 #endif
     if (!_fileManager.mountArchive(archive_path.c_str(), ""))

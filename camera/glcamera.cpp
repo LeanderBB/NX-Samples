@@ -79,9 +79,8 @@ public:
 
     void doInit() NX_CPP_OVERRIDE
     {
-
-        glGenBuffers(1, &_vbo);
-        glGenVertexArrays(1, &_vao);
+        glCreateBuffers(1, &_vbo);
+        glCreateVertexArrays(1, &_vao);
 
         // load shaders
 
@@ -136,17 +135,29 @@ public:
 
         // setup gpu program input
 
-        glBindVertexArray(_vao);
-        glBindBuffer(GL_ARRAY_BUFFER, _vbo);
-
         const NX3DModel::ModelEntry* p_entry = p_model->entry(0);
         NX_ASSERT(p_entry);
         NX_ASSERT(p_entry->entry.components & kModelComponentVerticesBit);
-        glBufferData(GL_ARRAY_BUFFER, p_entry->entry.size, p_entry->ptr, GL_STATIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0 , nullptr);
-        glEnableVertexAttribArray(0);
+
+        glNamedBufferStorage(_vbo, p_entry->entry.size, p_entry->ptr, 0);
+
+        //1glNamedBufferData(_vbo, p_entry->entry.size, p_entry->ptr, GL_STATIC_DRAW);
+
+       /*   glBindVertexArray(_vao);
+            glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0 , nullptr);
+            glEnableVertexAttribArray(0);
+        */
 
 
+        glVertexArrayAttribBinding(_vao, 0, 0);
+        glVertexArrayAttribFormat(_vao, 0, 3, GL_FLOAT, GL_FALSE, 0);
+        glEnableVertexArrayAttrib(_vao, 0);
+        glVertexArrayVertexBuffer(_vao, 0, _vbo, 0, 12);
+
+
+
+        NX_ASSERT(glGetError() == GL_NO_ERROR);
 
         // locate uniforms
         _uniformColorLoc = glGetUniformLocation(_pProgram->oglHdl(), "sphere_color");
@@ -224,11 +235,11 @@ public:
 
     void doRun(const double elapsedSec) NX_CPP_OVERRIDE
     {
-
         updateInput(elapsedSec);
         // wipe the drawing surface clear
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        glBindVertexArray(_vao);
         NX3DModel* p_model = static_cast<NX3DModel*>(_mediaManager.get(_hdlModel));
 
         //glUseProgram (_ptrc_gl);

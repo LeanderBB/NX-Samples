@@ -56,16 +56,21 @@ public:
         glDepthFunc (GL_LESS); /* depth-testing interprets a smaller value as "closer" */
 
 
-        glGenBuffers (1, &_vbo);
-        glBindBuffer (GL_ARRAY_BUFFER, _vbo);
-        glBufferData (GL_ARRAY_BUFFER, 9 * sizeof (GLfloat), points, GL_STATIC_DRAW);
+        glCreateBuffers (1, &_vbo);
+        glNamedBufferData (_vbo, 9 * sizeof (GLfloat), points, GL_STATIC_DRAW);
 
-        glGenVertexArrays (1, &_vao);
+        glCreateVertexArrays (1, &_vao);
+        /*
         glBindVertexArray (_vao);
         glEnableVertexAttribArray (0);
         glBindBuffer (GL_ARRAY_BUFFER, _vbo);
         glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+        */
 
+        glVertexArrayAttribBinding(_vao, 0, 0);
+        glVertexArrayAttribFormat(_vao, 0, 3, GL_FLOAT, GL_FALSE, 0);
+        glEnableVertexArrayAttrib(_vao, 0);
+        glVertexArrayVertexBuffer(_vao, 0, _vbo, 0, 12);
 
         _colourLoc = glGetUniformLocation(_pProgram->oglHdl(), "inputColour");
         if (_colourLoc == -1)
