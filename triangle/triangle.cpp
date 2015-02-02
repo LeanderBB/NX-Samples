@@ -4,6 +4,8 @@
 #include "nx/ogl/nxoglinternal.h"
 #include "nx/ogl/nxoglprogram.h"
 #include "nx/gpu/nxgpuprogramsource.h"
+#include "nx/resource/nxgpuprogramresource.h"
+#include "nx/gpu/nxgpushaderinput.h"
 using namespace nx;
 
 
@@ -12,9 +14,9 @@ class GLTriangle : public GLTutApp
 public:
     GLTriangle():
         GLTutApp("triangle", "gltriangle"),
-        _pProgram(nullptr),
-        _vao(0),
-        _vbo(0),
+        _program(),
+        _vao(),
+        _vbo(),
         _colourLoc(-1),
         _params(-1)
     {
@@ -23,71 +25,108 @@ public:
 
     void doInit() NX_CPP_OVERRIDE
     {
-        NXHdl hdl_prog = _gpuResManager.create("programs/triangle.nxprog", nx::kGPUResourceTypeProgram);
+        _program = _mediaManager.create("prog", "programs/triangle.nxprog");
 
-        if (!hdl_prog.valid())
+        if (!_program.valid())
         {
             quit();
             return;
         }
 
-        if (!_gpuResManager.isLoaded(hdl_prog))
+        _mediaManager.load(_program);
+        if (!_mediaManager.isLoaded(_program))
         {
             quit();
             return;
         }
 
-        _pProgram = static_cast<NXOGLProgram*>(_gpuResManager.get(hdl_prog));
+        NXGPUProgramResourcePtr_t prog_ptr = _mediaManager.get(_program);
 
-        if (!_pProgram)
+        if (!_program)
         {
             quit();
             return;
         }
 
         GLfloat points[] = {
-             0.0f,	0.5f,	0.0f,
-             0.5f, -0.5f,	0.0f,
+            0.0f,	0.5f,	0.0f,
+            0.5f, -0.5f,	0.0f,
             -0.5f, -0.5f,	0.0f
         };
 
-        /* tell GL to only draw onto a pixel if the shape is closer to the viewer */
-        glEnable (GL_DEPTH_TEST); /* enable depth-testing */
-        glDepthFunc (GL_LESS); /* depth-testing interprets a smaller value as "closer" */
+
+        glEnable (GL_DEPTH_TEST);
+        glDepthFunc (GL_LESS);
 
 
-        glCreateBuffers (1, &_vbo);
-        glNamedBufferData (_vbo, 9 * sizeof (GLfloat), points, GL_STATIC_DRAW);
+        NXGPUInterface* gpu_interface = _mediaManager.gpuInterface();
 
-        glCreateVertexArrays (1, &_vao);
-        /*
-        glBindVertexArray (_vao);
-        glEnableVertexAttribArray (0);
-        glBindBuffer (GL_ARRAY_BUFFER, _vbo);
-        glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
-        */
+        // create gpu buffer
+        NXGPUBufferDesc buffer_desc;
+        buffer_desc.flags = 0;
+        buffer_desc.mode = 0;
+        buffer_desc.size = sizeof(float) * 9;
+        buffer_desc.type = kGPUBufferTypeData;
 
-        glVertexArrayAttribBinding(_vao, 0, 0);
-        glVertexArrayAttribFormat(_vao, 0, 3, GL_FLOAT, GL_FALSE, 0);
-        glEnableVertexArrayAttrib(_vao, 0);
-        glVertexArrayVertexBuffer(_vao, 0, _vbo, 0, 12);
+        _vbo = gpu_interface->allocBuffer(buffer_desc, points);
 
-        _colourLoc = glGetUniformLocation(_pProgram->oglHdl(), "inputColour");
+        if (!_vbo)
+        {
+            NXLogError("Failed to create buffer");
+            quit();
+            return;
+        }
+
+        NXGPUShaderInput shader_input;
+
+        // set input
+        NXGPUShaderInputDesc input_desc;
+        input_desc.binding_idx = 0;
+        input_desc.data_count = 3;
+        input_desc.data_idx = kGPUShaderInputIdxVertices;
+        input_desc.data_offset = 0;
+        input_desc.data_type = kGPUDataTypeFloat;
+
+        if (!shader_input.addInput(input_desc))
+        {
+            NXLogError("Failed to set shader input");
+            quit();
+            return;
+        }
+
+        NXGPUBufferHdl buffer_hdl;
+        buffer_hdl.gpuhdl = _vbo;
+
+        if (!shader_input.addBuffer(buffer_hdl, 0))
+        {
+            NXLogError("Failed to set buffer binding");
+            quit();
+            return;
+        }
+
+        _vao = gpu_interface->allocShaderInput(shader_input);
+        if (!_vao)
+        {
+            NXLogError("Failed to create shader input");
+            quit();
+            return;
+        }
+
+        _colourLoc = _pGPUInterface->uniformLocation(prog_ptr->gpuHdl(), "inputColour");
         if (_colourLoc == -1)
         {
             NXLogError("Failed to located uniform 'inputColour'");
             quit();
             return;
         }
-
-        glUseProgram(_pProgram->oglHdl());
+        _pGPUInterface->bindProgram(prog_ptr->gpuHdl());
         glUniform4f (_colourLoc, 1.0f, 0.0f, 0.0f, 1.0f);
     }
 
 
     void doTerm() NX_CPP_OVERRIDE
     {
-
+        // nothign to do, handled by managers
     }
 
 
@@ -104,17 +143,16 @@ public:
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport (0, 0, windowWidth(), windowHeight());
 
-        glUseProgram(_pProgram->oglHdl());
-        glBindVertexArray (_vao);
+        _mediaManager.gpuInterface()->bindShaderInput(_vao);
         /* draw points 0-3 from the currently bound VAO with current in-use shader */
         glDrawArrays (GL_TRIANGLES, 0, 3);
     }
 
 
 protected:
-    NXOGLProgram* _pProgram;
-    GLuint _vao;
-    GLuint _vbo;
+    NXHdl _program;
+    NXHdl _vao;
+    NXHdl _vbo;
     GLint _colourLoc;
     int _params;
 };

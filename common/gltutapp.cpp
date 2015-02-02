@@ -7,6 +7,7 @@
 #include "nx/event/nxeventmanager.h"
 #include "nx/sys/nxsysevents.h"
 #include "nx/util/nxtime.h"
+#include <nx/os/nxpath.h>
 
 GLTutApp::GLTutApp(const char* name,
                    const char* archiveName):
@@ -14,7 +15,7 @@ GLTutApp::GLTutApp(const char* name,
     _archiveName(archiveName),
     _fileManager(),
     _mediaManager(_fileManager),
-    _gpuResManager(_mediaManager)
+    _pGPUInterface(nullptr)
 {
 }
 
@@ -100,7 +101,8 @@ GLTutApp::onAppInit(const int,
     archive_path += _archiveName;
     archive_path += ".yaaf";
 #else
-    archive_path =_archiveName;
+    archive_path = nx::NXPath::join(nx::NXPath::cwd(), "nx.samples.");
+    archive_path += _archiveName;
     archive_path += ".yaaf";
 #endif
     if (!_fileManager.mountArchive(archive_path.c_str(), ""))
@@ -124,6 +126,15 @@ GLTutApp::onAppWillTerm()
 void
 GLTutApp::onWindowCreated()
 {
+    _pGPUInterface = nx::NXGPUInterface::create();
+
+    if(!_pGPUInterface->init())
+    {
+        nx::NXLogError("Failed to init GPU Interface");
+        quit();
+        return;
+    }
+    _mediaManager.setGPUInterface(_pGPUInterface);
     doInit();
 }
 
@@ -131,6 +142,6 @@ void
 GLTutApp::onWindowWillBeDestroyed()
 {
     doTerm();
-    _gpuResManager.clear();
+    NX_SAFE_DELETE(_pGPUInterface);
 }
 

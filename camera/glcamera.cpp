@@ -10,6 +10,9 @@
 #include <nx/math/nx3dmath.h>
 #include <nx/math/nxtransform.h>
 #include <nx/sys/nxwindow.h>
+#include <nx/resource/nxgpuprogramresource.h>
+#include <nx/resource/nx3dmodelresource.h>
+
 using namespace nx;
 
 
@@ -46,7 +49,7 @@ public:
         _speherePosWorld(),
         _spehereColor(),
         _hdlModel(),
-        _pProgram(nullptr),
+        _program(),
         _vao(0),
         _vbo(0)
 
@@ -84,21 +87,21 @@ public:
 
         // load shaders
 
-        NXHdl hdl_prog = _gpuResManager.create("programs/camera.nxprog", nx::kGPUResourceTypeProgram);
-
+        NXHdl hdl_prog = _mediaManager.create("prog","programs/camera.nxprog");
         if (!hdl_prog.valid())
         {
             quit();
             return;
         }
 
-        if (!_gpuResManager.isLoaded(hdl_prog))
+        _mediaManager.load(hdl_prog);
+        if (!_mediaManager.isLoaded(hdl_prog))
         {
             quit();
             return;
         }
 
-        _pProgram = static_cast<NXOGLProgram*>(_gpuResManager.get(hdl_prog));
+        _program = _mediaManager.get(hdl_prog);
 
 /*
         // load model
@@ -117,21 +120,22 @@ public:
             return false;
         }
 */
-        _hdlModel = _mediaManager.create("models/sphere.nx3d", kMediaTypeModel);
-
+        _hdlModel = _mediaManager.create("model","models/sphere.nx3d");
         if (!_hdlModel.valid())
         {
             quit();
             return;
         }
 
+        _mediaManager.load(_hdlModel);
         if (!_mediaManager.isLoaded(_hdlModel))
         {
             quit();
             return;
         }
 
-        NX3DModel* p_model = static_cast<NX3DModel*>(_mediaManager.get(_hdlModel));
+        NX3DModelResourcePtr_t model_ptr = _mediaManager.get(_hdlModel);
+        const NX3DModel* p_model = model_ptr->model();
 
         // setup gpu program input
 
@@ -159,11 +163,13 @@ public:
 
         NX_ASSERT(glGetError() == GL_NO_ERROR);
 
+        NXHdl gpuhdl = _program->gpuHdl();
+
         // locate uniforms
-        _uniformColorLoc = glGetUniformLocation(_pProgram->oglHdl(), "sphere_color");
-        _uniformModelLoc = glGetUniformLocation(_pProgram->oglHdl(), "model");
-        _uniformViewLoc = glGetUniformLocation(_pProgram->oglHdl(), "view");
-        _uniformProjLoc = glGetUniformLocation(_pProgram->oglHdl(), "proj");
+        _uniformColorLoc = _pGPUInterface->uniformLocation(gpuhdl, "sphere_color");
+        _uniformModelLoc = _pGPUInterface->uniformLocation(gpuhdl, "model");
+        _uniformViewLoc = _pGPUInterface->uniformLocation(gpuhdl, "view");
+        _uniformProjLoc = _pGPUInterface->uniformLocation(gpuhdl, "proj");
 
 
         // setup camera info
@@ -198,7 +204,7 @@ public:
             _camState.modelMats[i] = glm::translate (tmp, _speherePosWorld[i]);
         }
 
-        glUseProgram(_pProgram->oglHdl());
+        _pGPUInterface->bindProgram(gpuhdl);
         glUniformMatrix4fv (_uniformViewLoc, 1, GL_FALSE, glm::value_ptr(_viewMat));
         glUniformMatrix4fv (_uniformProjLoc, 1, GL_FALSE, glm::value_ptr(_projMat));
 
@@ -219,11 +225,8 @@ public:
     void doTerm() NX_CPP_OVERRIDE
     {
         inputManager()->remInputCtx(this);
-        if (_hdlModel.valid())
-        {
-            _mediaManager.remove(_hdlModel);
-        }
 
+        _program.reset();
         if (_vao)
         {
             glDeleteVertexArrays(1, &_vao);
@@ -240,13 +243,13 @@ public:
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glBindVertexArray(_vao);
-        NX3DModel* p_model = static_cast<NX3DModel*>(_mediaManager.get(_hdlModel));
+        NX3DModelResourcePtr_t model = _mediaManager.get(_hdlModel);
 
         //glUseProgram (_ptrc_gl);
         for (int i = 0; i < 4; i++) {
             glUniform4fv(_uniformColorLoc, 1, glm::value_ptr(_spehereColor[i]));
             glUniformMatrix4fv (_uniformModelLoc, 1, GL_FALSE, glm::value_ptr(_camState.modelMats[i]));
-            glDrawArrays (GL_TRIANGLES, 0, p_model->header().nVertices);
+            glDrawArrays (GL_TRIANGLES, 0, model->model()->header().nVertices);
         }
     }
 
@@ -444,7 +447,7 @@ protected:
     glm::vec3 _speherePosWorld[4];
     glm::vec4 _spehereColor[4];
     NXHdl _hdlModel;
-    NXOGLProgram* _pProgram;
+    NXGPUProgramResourcePtr_t _program;
     nx_u32 _vao;
     nx_u32 _vbo;
 

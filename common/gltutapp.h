@@ -6,8 +6,8 @@
 #include <nx/sys/nxapp.h>
 #include <nx/event/nxeventlistener.h>
 #include <nx/io/nxfilemanager.h>
-#include <nx/media/nxmediamanager.h>
-#include <nx/gpu/nxgpuresourcemanager.h>
+#include <nx/resource/nxresourcemanager.h>
+#include <nx/gpu/nxgpuinterface.h>
 
 class GLTutApp : public nx::NXApp
 {
@@ -52,8 +52,8 @@ protected:
 protected:
     const nx::NXString _archiveName;
     nx::NXFileManager _fileManager;
-    nx::NXMediaManager _mediaManager;
-    nx::NXGPUResourceManager _gpuResManager;
+    nx::NXResourceManager _mediaManager;
+    nx::NXGPUInterface* _pGPUInterface;
 };
 
 
