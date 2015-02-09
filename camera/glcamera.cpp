@@ -12,6 +12,7 @@
 #include <nx/sys/nxwindow.h>
 #include <nx/resource/nxgpuprogramresource.h>
 #include <nx/resource/nx3dmodelresource.h>
+#include <nx/resource/nxgpumeshresource.h>
 
 using namespace nx;
 
@@ -49,9 +50,7 @@ public:
         _speherePosWorld(),
         _spehereColor(),
         _hdlModel(),
-        _program(),
-        _vao(0),
-        _vbo(0)
+        _program()
 
     {
         _speherePosWorld[0] = glm::vec3(-2.0f, 0.0f, 0.0f);
@@ -82,9 +81,6 @@ public:
 
     void doInit() NX_CPP_OVERRIDE
     {
-        glCreateBuffers(1, &_vbo);
-        glCreateVertexArrays(1, &_vao);
-
         // load shaders
 
         NXHdl hdl_prog = _mediaManager.create("prog","programs/camera.nxprog");
@@ -103,23 +99,6 @@ public:
 
         _program = _mediaManager.get(hdl_prog);
 
-/*
-        // load model
-        NXIOBase* pIO = _fileManager.open("models/sphere.nx3d", kIOAccessModeReadBit);
-
-        if (!pIO)
-        {
-            return false;
-        }
-
-        _pModel = NX3DModel::load(pIO);
-        NX_SAFE_DELETE(pIO);
-
-        if (!_pModel)
-        {
-            return false;
-        }
-*/
         _hdlModel = _mediaManager.create("model","models/sphere.nx3d");
         if (!_hdlModel.valid())
         {
@@ -133,35 +112,6 @@ public:
             quit();
             return;
         }
-
-        NX3DModelResourcePtr_t model_ptr = _mediaManager.get(_hdlModel);
-        const NX3DModel* p_model = model_ptr->model();
-
-        // setup gpu program input
-
-        const NX3DModel::ModelEntry* p_entry = p_model->entry(0);
-        NX_ASSERT(p_entry);
-        NX_ASSERT(p_entry->entry.components & kModelComponentVerticesBit);
-
-        glNamedBufferStorage(_vbo, p_entry->entry.size, p_entry->ptr, 0);
-
-        //1glNamedBufferData(_vbo, p_entry->entry.size, p_entry->ptr, GL_STATIC_DRAW);
-
-       /*   glBindVertexArray(_vao);
-            glBindBuffer(GL_ARRAY_BUFFER, _vbo);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0 , nullptr);
-            glEnableVertexAttribArray(0);
-        */
-
-
-        glVertexArrayAttribBinding(_vao, 0, 0);
-        glVertexArrayAttribFormat(_vao, 0, 3, GL_FLOAT, GL_FALSE, 0);
-        glEnableVertexArrayAttrib(_vao, 0);
-        glVertexArrayVertexBuffer(_vao, 0, _vbo, 0, 12);
-
-
-
-        NX_ASSERT(glGetError() == GL_NO_ERROR);
 
         NXHdl gpuhdl = _program->gpuHdl();
 
@@ -196,10 +146,6 @@ public:
         _viewMat = _transform.toMatixInv();
 #endif
 
-
-
-
-
         for (int i = 0; i < 4; i++) {
             _camState.modelMats[i] = glm::translate (tmp, _speherePosWorld[i]);
         }
@@ -225,13 +171,7 @@ public:
     void doTerm() NX_CPP_OVERRIDE
     {
         inputManager()->remInputCtx(this);
-
         _program.reset();
-        if (_vao)
-        {
-            glDeleteVertexArrays(1, &_vao);
-            glDeleteBuffers(1, &_vbo);
-        }
     }
 
 
@@ -242,14 +182,14 @@ public:
         // wipe the drawing surface clear
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glBindVertexArray(_vao);
-        NX3DModelResourcePtr_t model = _mediaManager.get(_hdlModel);
-
-        //glUseProgram (_ptrc_gl);
+        NXGPUMeshResourcePtr_t mesh = _mediaManager.get(_hdlModel);
+        NXGPUSubMeshPtr_t sub_mesh = mesh->mesh()->submesh(0);
+        _pGPUInterface->bindShaderInput(sub_mesh->gpuHdl());
         for (int i = 0; i < 4; i++) {
             glUniform4fv(_uniformColorLoc, 1, glm::value_ptr(_spehereColor[i]));
             glUniformMatrix4fv (_uniformModelLoc, 1, GL_FALSE, glm::value_ptr(_camState.modelMats[i]));
-            glDrawArrays (GL_TRIANGLES, 0, model->model()->header().nVertices);
+
+            glDrawElements(GL_TRIANGLES, sub_mesh->indexCount(), GL_UNSIGNED_INT, 0);
         }
     }
 
@@ -448,9 +388,6 @@ protected:
     glm::vec4 _spehereColor[4];
     NXHdl _hdlModel;
     NXGPUProgramResourcePtr_t _program;
-    nx_u32 _vao;
-    nx_u32 _vbo;
-
 
     int _uniformColorLoc;
     int _uniformModelLoc;

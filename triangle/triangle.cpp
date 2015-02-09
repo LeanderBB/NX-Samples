@@ -67,8 +67,9 @@ public:
         buffer_desc.mode = 0;
         buffer_desc.size = sizeof(float) * 9;
         buffer_desc.type = kGPUBufferTypeData;
+        buffer_desc.data = points;
 
-        _vbo = gpu_interface->allocBuffer(buffer_desc, points);
+        _vbo = gpu_interface->allocBuffer(buffer_desc);
 
         if (!_vbo)
         {
