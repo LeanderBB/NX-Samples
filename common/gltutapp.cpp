@@ -126,7 +126,7 @@ GLTutApp::onAppWillTerm()
 void
 GLTutApp::onWindowCreated()
 {
-    _pGPUInterface = nx::NXGPUInterface::create();
+    _pGPUInterface = new nx::NXGPUInterfaceOGL();
 
     if(!_pGPUInterface->init())
     {

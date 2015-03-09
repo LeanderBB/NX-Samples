@@ -1,4 +1,21 @@
-
+//
+// This file is part of the NX Project
+//
+// Copyright (c) 2014-2015 Leander Beernaert
+//
+// NX Project is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// NX Project is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with NX. If not, see <http://www.gnu.org/licenses/>.
+//
 #include "gltutapp.h"
 #include <nx/media/nx3dmodel.h>
 #include <nx/ogl/nxoglprogram.h>
@@ -17,7 +34,7 @@
 using namespace nx;
 
 
-#define USE_NX_TRANSFORM
+//#define USE_NX_TRANSFORM
 struct CameraState
 {
     float near = 0.1f;
@@ -50,12 +67,13 @@ public:
         _speherePosWorld(),
         _spehereColor(),
         _hdlModel(),
+        _hdlModelInterLeaved(),
         _program()
 
     {
         _speherePosWorld[0] = glm::vec3(-2.0f, 0.0f, 0.0f);
         _speherePosWorld[1] = glm::vec3(2.0f, 0.0f, 0.0f);
-        _speherePosWorld[2] = glm::vec3(2.0f, 0.0f, -2.0f);
+        _speherePosWorld[2] = glm::vec3(-2.0f, 0.0f, -2.0f);
         _speherePosWorld[3] = glm::vec3(1.5f, 1.0f, -1.0f);
 
         _spehereColor[0] = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
@@ -73,7 +91,7 @@ public:
         nx::NXLog("Resize %dx%d", w, h);
 
         _camState.aspect = (float)w/(float)h;
-        _projMat = glm::perspective(_camState.fovy, _camState.aspect, _camState.near, _camState.far);
+        _projMat = glm::perspective(glm::radians(_camState.fovy), _camState.aspect, _camState.near, _camState.far);
         glUniformMatrix4fv (_uniformProjLoc, 1, GL_FALSE, glm::value_ptr(_projMat));
         glViewport (0, 0, w, h);
     }
@@ -106,12 +124,28 @@ public:
             return;
         }
 
+        _hdlModelInterLeaved = _mediaManager.create("model-inter",
+                                                    "models/sphere_interleaved.nx3d");
+        if (!_hdlModelInterLeaved.valid())
+        {
+            quit();
+            return;
+        }
+
         _mediaManager.load(_hdlModel);
         if (!_mediaManager.isLoaded(_hdlModel))
         {
             quit();
             return;
         }
+
+        _mediaManager.load(_hdlModelInterLeaved);
+        if (!_mediaManager.isLoaded(_hdlModelInterLeaved))
+        {
+            quit();
+            return;
+        }
+
 
         NXHdl gpuhdl = _program->gpuHdl();
 
@@ -143,7 +177,7 @@ public:
 
         glm::quat qtmp2 = glm::angleAxis(glm::radians(_camState.cam_heading), glm::vec3(0.0f, 1.0f, 0.0f));
         _transform.rotate(qtmp2);
-        _viewMat = _transform.toMatixInv();
+        _viewMat = _transform.toMatrixInv();
 #endif
 
         for (int i = 0; i < 4; i++) {
@@ -184,10 +218,24 @@ public:
 
         NXGPUMeshResourcePtr_t mesh = _mediaManager.get(_hdlModel);
         NXGPUSubMeshPtr_t sub_mesh = mesh->mesh()->submesh(0);
-        _pGPUInterface->bindShaderInput(sub_mesh->gpuHdl());
+
+
+        NXGPUMeshResourcePtr_t mesh_inter = _mediaManager.get(_hdlModelInterLeaved);
+        NXGPUSubMeshPtr_t sub_mesh_inter = mesh_inter->mesh()->submesh(0);
+
+
         for (int i = 0; i < 4; i++) {
             glUniform4fv(_uniformColorLoc, 1, glm::value_ptr(_spehereColor[i]));
             glUniformMatrix4fv (_uniformModelLoc, 1, GL_FALSE, glm::value_ptr(_camState.modelMats[i]));
+
+            if (i % 2)
+            {
+                _pGPUInterface->bindShaderInput(sub_mesh->gpuHdl());
+            }
+            else
+            {
+                _pGPUInterface->bindShaderInput(sub_mesh_inter->gpuHdl());
+            }
 
             glDrawElements(GL_TRIANGLES, sub_mesh->indexCount(), GL_UNSIGNED_INT, 0);
         }
@@ -225,10 +273,16 @@ public:
     {
         // control keys
         bool cam_moved = false;
-        glm::vec3 move (0.0, 0.0, 0.0);
+        glm::vec3 move (0.0f, 0.0f, 0.0f);
         float cam_yaw = 0.0f; // y-rotation in degrees
         float cam_pitch = 0.0f;
-        float cam_roll = 0.0;
+        float cam_roll = 0.0f;
+
+        if (_keysPressed[kInputKeyEscape])
+        {
+            system()->signalQuit();
+            return;
+        }
 
         if (_keysPressed[kInputKeyA])
         {
@@ -260,8 +314,11 @@ public:
             move.z += _camState.cam_speed * elapsedSeconds;
             cam_moved = true;
         }
-
-
+#if defined(USE_NX_TRANSFORM)
+        auto cur_up = _transform.up();
+        auto cur_right = _transform.right();
+        auto cur_fwd = _transform.forward();
+#endif
         if (_keysPressed[kInputKeyLeft])
         {
             cam_yaw += _camState.cam_heading_speed * elapsedSeconds;
@@ -269,9 +326,10 @@ public:
 
             // create a quaternion representing change in heading (the yaw)
 #if !defined(USE_NX_TRANSFORM)
-            _camState.quaternion = glm::rotate(_camState.quaternion,glm::radians(cam_yaw), glm::vec3(_camState.up.x, _camState.up.y, _camState.up.z));
+            glm::quat local_quat = glm::angleAxis(glm::radians(cam_yaw), glm::vec3(_camState.up.x, _camState.up.y, _camState.up.z));
+            _camState.quaternion = local_quat * _camState.quaternion;
 #else
-            _transform.rotate(glm::angleAxis(glm::radians(cam_yaw), _transform.up()));
+            _transform.rotatePrefix(glm::angleAxis(glm::radians(cam_yaw), cur_up));
 #endif
         }
         if (_keysPressed[kInputKeyRight])
@@ -279,36 +337,36 @@ public:
             cam_yaw -= _camState.cam_heading_speed * elapsedSeconds;
             cam_moved = true;
 #if !defined(USE_NX_TRANSFORM)
-            _camState.quaternion = glm::rotate(_camState.quaternion, glm::radians(cam_yaw), glm::vec3(_camState.up.x, _camState.up.y, _camState.up.z));
+            _camState.quaternion = glm::angleAxis(glm::radians(cam_yaw), glm::vec3(_camState.up.x, _camState.up.y, _camState.up.z)) * _camState.quaternion;
 #else
-            _transform.rotate(glm::angleAxis(glm::radians(cam_yaw), _transform.up()));
+            _transform.rotatePrefix(glm::angleAxis(glm::radians(cam_yaw),cur_up));
 #endif
         }
         if (_keysPressed[kInputKeyUp]) {
             cam_pitch += _camState.cam_heading_speed * elapsedSeconds;
             cam_moved = true;
 #if !defined(USE_NX_TRANSFORM)
-            _camState.quaternion = glm::rotate(_camState.quaternion, glm::radians(cam_pitch), glm::vec3(_camState.rgt.x, _camState.rgt.y, _camState.rgt.z));
+            _camState.quaternion = glm::angleAxis(glm::radians(cam_pitch), glm::vec3(_camState.rgt.x, _camState.rgt.y, _camState.rgt.z)) * _camState.quaternion;
 #else
-            _transform.rotate(glm::angleAxis(glm::radians(cam_pitch), _transform.right()));
+            _transform.rotatePrefix(glm::angleAxis(glm::radians(cam_pitch), cur_right));
 #endif
         }
         if (_keysPressed[kInputKeyDown]) {
             cam_pitch -= _camState.cam_heading_speed * elapsedSeconds;
             cam_moved = true;
 #if !defined(USE_NX_TRANSFORM)
-            _camState.quaternion = glm::rotate(_camState.quaternion, glm::radians(cam_pitch), glm::vec3(_camState.rgt.x, _camState.rgt.y, _camState.rgt.z));
+            _camState.quaternion = glm::angleAxis(glm::radians(cam_pitch), glm::vec3(_camState.rgt.x, _camState.rgt.y, _camState.rgt.z)) * _camState.quaternion;
 #else
-            _transform.rotate(glm::angleAxis(glm::radians(cam_pitch), _transform.right()));
+            _transform.rotatePrefix(glm::angleAxis(glm::radians(cam_pitch), cur_right));
 #endif
         }
         if (_keysPressed[kInputKeyZ]) {
             cam_roll -= _camState.cam_heading_speed * elapsedSeconds;
             cam_moved = true;
 #if !defined(USE_NX_TRANSFORM)
-            _camState.quaternion = glm::rotate(_camState.quaternion, glm::radians(cam_roll), glm::vec3(_camState.fwd.x, _camState.fwd.y, _camState.fwd.z));
+            _camState.quaternion = glm::angleAxis(glm::radians(cam_roll), glm::vec3(_camState.fwd.x, _camState.fwd.y, _camState.fwd.z)) * _camState.quaternion;
 #else
-            _transform.rotate(glm::angleAxis(glm::radians(cam_roll), _transform.forward()));
+            _transform.rotatePrefix(glm::angleAxis(glm::radians(cam_roll), cur_fwd));
 #endif
         }
         if (_keysPressed[kInputKeyC])
@@ -316,29 +374,26 @@ public:
             cam_roll += _camState.cam_heading_speed * elapsedSeconds;
             cam_moved = true;
 #if !defined(USE_NX_TRANSFORM)
-            _camState.quaternion = glm::rotate(_camState.quaternion, glm::radians(cam_roll), glm::vec3(_camState.fwd.x, _camState.fwd.y, _camState.fwd.z));
+            _camState.quaternion = glm::angleAxis(glm::radians(cam_roll), glm::vec3(_camState.fwd.x, _camState.fwd.y, _camState.fwd.z)) * _camState.quaternion;
 #else
-            _transform.rotate(glm::angleAxis(glm::radians(cam_roll), _transform.forward()));
+            _transform.rotatePrefix(glm::angleAxis(glm::radians(cam_roll), cur_fwd));
 #endif
         }
 
         // update mouse
-        if (_deltax != 0.0f || _deltay != 0.0f)
+        if (_deltax != 0 || _deltay != 0)
         {
             cam_moved = true;
-            cam_yaw -= 5.0f * elapsedSeconds * _deltax;
-            cam_pitch += 5.0f * elapsedSeconds * _deltay;
+            cam_yaw -= 5.0f * elapsedSeconds * (float)_deltax;
+            cam_pitch += 5.0f * elapsedSeconds * (float)_deltay;
 
-            glm::quat cam_mouse_rot;
 #if !defined(USE_NX_TRANSFORM)
-            cam_mouse_rot = glm::angleAxis(glm::radians(cam_yaw), glm::vec3(_camState.up.x, _camState.up.y, _camState.up.z));
-            cam_mouse_rot *= glm::angleAxis(glm::radians(cam_pitch), glm::vec3(_camState.rgt.x, _camState.rgt.y, _camState.rgt.z));
-            _camState.quaternion *= cam_mouse_rot;
+            _camState.quaternion = glm::angleAxis(glm::radians(cam_yaw), glm::vec3(_camState.up.x, _camState.up.y, _camState.up.z)) * _camState.quaternion;
+            _camState.quaternion = glm::angleAxis(glm::radians(cam_pitch), glm::vec3(_camState.rgt.x, _camState.rgt.y, _camState.rgt.z)) *_camState.quaternion;
 #else
-            cam_mouse_rot = glm::angleAxis(glm::radians(cam_pitch), _transform.right());
-            cam_mouse_rot *= glm::angleAxis(glm::radians(cam_yaw), _transform.up());
+            _transform.rotatePrefix(glm::angleAxis(glm::radians(cam_yaw), cur_up));
+            _transform.rotatePrefix(glm::angleAxis(glm::radians(cam_pitch), cur_right));
 
-            _transform.rotate(cam_mouse_rot);
 #endif
             _deltax = 0.0f;
             _deltay = 0.0f;
@@ -357,8 +412,7 @@ public:
             _camPos = _camPos + glm::vec3 (_camState.fwd) * -move.z;
             _camPos = _camPos + glm::vec3 (_camState.up) * move.y;
             _camPos = _camPos + glm::vec3 (_camState.rgt) * move.x;
-            glm::mat4 tmp;
-            glm::mat4 T = glm::translate (tmp, glm::vec3 (_camPos));
+            glm::mat4 T = glm::translate (glm::mat4(), glm::vec3 (_camPos));
 
             _viewMat = glm::inverse (R) * glm::inverse (T);
 #else
@@ -370,7 +424,7 @@ public:
             _transform.translate(right * move.x);
             _transform.translate(up * move.y);
 
-            _viewMat = _transform.toMatixInv();
+            _viewMat = _transform.toMatrixInv();
 #endif
             glUniformMatrix4fv (_uniformViewLoc, 1, GL_FALSE, glm::value_ptr(_viewMat));
         }
@@ -387,6 +441,7 @@ protected:
     glm::vec3 _speherePosWorld[4];
     glm::vec4 _spehereColor[4];
     NXHdl _hdlModel;
+    NXHdl _hdlModelInterLeaved;
     NXGPUProgramResourcePtr_t _program;
 
     int _uniformColorLoc;
@@ -396,7 +451,7 @@ protected:
 
     CameraState _camState;
     bool _keysPressed[kInputKeyTotal];
-    float _deltax, _deltay;
+    nx_i32 _deltax, _deltay;
 #if defined(USE_NX_TRANSFORM)
     NXTransform _transform;
 #endif
